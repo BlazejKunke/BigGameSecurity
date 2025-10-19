@@ -52,11 +52,11 @@ public sealed class SecurityGate : Entity
         }
     }
 
-    public void ProcessNextGuest()
+    public SecurityProcessingResult? ProcessNextGuest()
     {
         if (GuestQueue.Count == 0 || AssignedStaff.Count == 0)
         {
-            return;
+            return null;
         }
 
         var guest = GuestQueue.Dequeue();
@@ -65,7 +65,7 @@ public sealed class SecurityGate : Entity
         if (!guest.IsHighRisk)
         {
             guest.CurrentState = GuestState.WatchingGame;
-            return;
+            return new SecurityProcessingResult(guest, SecurityProcessingOutcome.None);
         }
 
         var detected = CheckDetection(guest);
@@ -74,12 +74,12 @@ public sealed class SecurityGate : Entity
         {
             IncidentsDetected++;
             guest.CurrentState = guest.IsMTE ? GuestState.AtJail : GuestState.Denied;
+            return new SecurityProcessingResult(guest, SecurityProcessingOutcome.ThreatDetected);
         }
-        else
-        {
-            IncidentsMissed++;
-            guest.CurrentState = GuestState.WatchingGame;
-        }
+
+        IncidentsMissed++;
+        guest.CurrentState = GuestState.WatchingGame;
+        return new SecurityProcessingResult(guest, SecurityProcessingOutcome.ThreatMissed);
     }
 
     private bool CheckDetection(SecurityGuest guest)
@@ -96,3 +96,12 @@ public sealed class SecurityGate : Entity
         return Random.Shared.NextDouble() < detectionChance;
     }
 }
+
+public enum SecurityProcessingOutcome
+{
+    None,
+    ThreatDetected,
+    ThreatMissed
+}
+
+public sealed record SecurityProcessingResult(SecurityGuest Guest, SecurityProcessingOutcome Outcome);
