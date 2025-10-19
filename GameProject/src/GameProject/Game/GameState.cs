@@ -11,6 +11,9 @@ public class GameState
     {
         TimeManager = new TimeManager(DateTime.Today.AddHours(6));
         ReputationManager = new ReputationManager();
+        GateManager = new GateManager(6);
+        GuestFlowManager = new GuestFlowManager(GateManager);
+        IncidentManager = new IncidentManager(GateManager, ReputationManager);
     }
 
     public Player Player { get; } = new("Avery");
@@ -18,6 +21,12 @@ public class GameState
     public TimeManager TimeManager { get; }
 
     public ReputationManager ReputationManager { get; }
+
+    public GateManager GateManager { get; }
+
+    public GuestFlowManager GuestFlowManager { get; }
+
+    public IncidentManager IncidentManager { get; }
 
     /// <summary>
     /// Active gates registered in the park.
