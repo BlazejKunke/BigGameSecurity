@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameProject.Game;
 
 namespace GameProject.Entities;
 
@@ -52,11 +53,16 @@ public sealed class SecurityGate : Entity
         }
     }
 
-    public SecurityProcessingResult? ProcessNextGuest()
+    public GuestProcessingResult ProcessNextGuest(ReputationCalculator reputationCalculator)
     {
+        if (reputationCalculator is null)
+        {
+            throw new ArgumentNullException(nameof(reputationCalculator));
+        }
+
         if (GuestQueue.Count == 0 || AssignedStaff.Count == 0)
         {
-            return null;
+            return GuestProcessingResult.NoGuestsToProcess;
         }
 
         var guest = GuestQueue.Dequeue();
@@ -65,7 +71,11 @@ public sealed class SecurityGate : Entity
         if (!guest.IsHighRisk)
         {
             guest.CurrentState = GuestState.WatchingGame;
-            return new SecurityProcessingResult(guest, SecurityProcessingOutcome.None);
+            return new GuestProcessingResult
+            {
+                Guest = guest,
+                Result = ProcessingOutcome.AllowedEntry
+            };
         }
 
         var detected = CheckDetection(guest);
@@ -74,12 +84,22 @@ public sealed class SecurityGate : Entity
         {
             IncidentsDetected++;
             guest.CurrentState = guest.IsMTE ? GuestState.AtJail : GuestState.Denied;
-            return new SecurityProcessingResult(guest, SecurityProcessingOutcome.ThreatDetected);
+            reputationCalculator.ApplyThreatDetected(guest);
+            return new GuestProcessingResult
+            {
+                Guest = guest,
+                Result = ProcessingOutcome.ThreatDetected
+            };
         }
 
         IncidentsMissed++;
         guest.CurrentState = GuestState.WatchingGame;
-        return new SecurityProcessingResult(guest, SecurityProcessingOutcome.ThreatMissed);
+        reputationCalculator.ApplyThreatMissed(guest);
+        return new GuestProcessingResult
+        {
+            Guest = guest,
+            Result = ProcessingOutcome.ThreatMissed
+        };
     }
 
     private bool CheckDetection(SecurityGuest guest)
@@ -96,12 +116,3 @@ public sealed class SecurityGate : Entity
         return Random.Shared.NextDouble() < detectionChance;
     }
 }
-
-public enum SecurityProcessingOutcome
-{
-    None,
-    ThreatDetected,
-    ThreatMissed
-}
-
-public sealed record SecurityProcessingResult(SecurityGuest Guest, SecurityProcessingOutcome Outcome);

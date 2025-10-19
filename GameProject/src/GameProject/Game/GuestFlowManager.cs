@@ -169,30 +169,17 @@ public sealed class GuestFlowManager
 
             while (accumulated >= secondsPerGuest && gate.GuestQueue.Count > 0)
             {
-                var result = gate.ProcessNextGuest();
-                if (result is null)
+                var result = gate.ProcessNextGuest(_reputationCalculator);
+
+                if (result.Result == ProcessingOutcome.NoGuestsInQueue || result.Guest is null)
                 {
                     break;
                 }
 
-                HandleProcessingResult(result);
                 accumulated -= secondsPerGuest;
             }
 
             _gateProcessingTimers[gate.Id] = accumulated;
-        }
-    }
-
-    private void HandleProcessingResult(SecurityProcessingResult result)
-    {
-        switch (result.Outcome)
-        {
-            case SecurityProcessingOutcome.ThreatDetected:
-                _reputationCalculator.ApplyThreatDetected(result.Guest);
-                break;
-            case SecurityProcessingOutcome.ThreatMissed:
-                _reputationCalculator.ApplyThreatMissed(result.Guest);
-                break;
         }
     }
 
