@@ -15,11 +15,13 @@ public sealed class GuestFlowManager
     private readonly GateManager _gateManager;
     private readonly List<SecurityGuest> _allGuests;
     private readonly Dictionary<int, TimeSpan> _gateProcessingTimers;
+    private readonly ReputationCalculator _reputationCalculator;
     private int _nextGuestId;
 
-    public GuestFlowManager(GateManager gateManager)
+    public GuestFlowManager(GateManager gateManager, ReputationCalculator reputationCalculator)
     {
         _gateManager = gateManager ?? throw new ArgumentNullException(nameof(gateManager));
+        _reputationCalculator = reputationCalculator ?? throw new ArgumentNullException(nameof(reputationCalculator));
         _allGuests = new List<SecurityGuest>();
         _gateProcessingTimers = gateManager.Gates.ToDictionary(g => g.Id, _ => TimeSpan.Zero);
         _nextGuestId = 1;
@@ -62,6 +64,7 @@ public sealed class GuestFlowManager
         SpawnGuestsForCurrentTime(currentGameTime);
         AssignGuestsToGates();
         ProcessGuestsAtGates(deltaTime);
+        _reputationCalculator.Update(currentGameTime);
     }
 
     private void SpawnGuestsForCurrentTime(TimeSpan currentTime)
@@ -149,6 +152,12 @@ public sealed class GuestFlowManager
                 continue;
             }
 
+            if (gate.AssignedStaff.Count == 0)
+            {
+                _gateProcessingTimers[gate.Id] = TimeSpan.Zero;
+                continue;
+            }
+
             if (gate.AverageObservation <= 0)
             {
                 continue;
@@ -160,11 +169,30 @@ public sealed class GuestFlowManager
 
             while (accumulated >= secondsPerGuest && gate.GuestQueue.Count > 0)
             {
-                gate.ProcessNextGuest();
+                var result = gate.ProcessNextGuest();
+                if (result is null)
+                {
+                    break;
+                }
+
+                HandleProcessingResult(result);
                 accumulated -= secondsPerGuest;
             }
 
             _gateProcessingTimers[gate.Id] = accumulated;
+        }
+    }
+
+    private void HandleProcessingResult(SecurityProcessingResult result)
+    {
+        switch (result.Outcome)
+        {
+            case SecurityProcessingOutcome.ThreatDetected:
+                _reputationCalculator.ApplyThreatDetected(result.Guest);
+                break;
+            case SecurityProcessingOutcome.ThreatMissed:
+                _reputationCalculator.ApplyThreatMissed(result.Guest);
+                break;
         }
     }
 
