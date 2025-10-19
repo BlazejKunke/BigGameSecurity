@@ -79,7 +79,7 @@ public sealed class SecurityStaff : Entity
     private double _currentFocus;
 
     public int CurrentFocus { get; private set; }
-    public Gate? AssignedGate { get; set; }
+    public SecurityGate? AssignedGate { get; set; }
     public bool IsOnDuty { get; set; }
 
     /// <summary>
